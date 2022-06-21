@@ -949,7 +949,7 @@ ExpressionResult ObjectExpression::DoEvaluate(ScriptFrame& frame, DebugHint *dhi
 	CHECK_RESULT(typeres);
 	Type::Ptr type = typeres.GetValue();
 
-	String name;
+	Value name;
 
 	if (m_Name) {
 		ExpressionResult nameres = m_Name->Evaluate(frame, dhint);
@@ -958,7 +958,17 @@ ExpressionResult ObjectExpression::DoEvaluate(ScriptFrame& frame, DebugHint *dhi
 		name = nameres.GetValue();
 	}
 
-	return VMOps::NewObject(frame, m_Abstract, type, name, m_Filter, m_Zone,
+	if (!m_DefaultTmpl) {
+		if (name.IsEmpty()) {
+			BOOST_THROW_EXCEPTION(ScriptError("Template/object name must not be empty", m_DebugInfo));
+		}
+
+		if (!name.IsString()) {
+			BOOST_THROW_EXCEPTION(ScriptError("Template/object name must be a string", m_DebugInfo));
+		}
+	}
+
+	return VMOps::NewObject(frame, m_Abstract, type, std::move(name), m_Filter, m_Zone,
 		m_Package, m_DefaultTmpl, m_IgnoreOnError, m_ClosedVars, m_Expression, m_DebugInfo);
 }
 
