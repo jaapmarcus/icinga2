@@ -190,8 +190,8 @@ bool ObjectQueryHandler::HandleRequest(
 		joinAttrs.insert(field.Name);
 	}
 
-	std::unordered_map<Type::Ptr, bool> evaluatedTypes;
-	std::unordered_map<Object *, bool> joinedRelations;
+	std::unordered_map<Type*, bool> evaluatedTypes;
+	std::unordered_map<Object*, bool> joinedRelations;
 
 	for (const ConfigObject::Ptr& obj : objs) {
 		DictionaryData result1{
@@ -264,7 +264,7 @@ bool ObjectQueryHandler::HandleRequest(
 			Type::Ptr reflectionType = joinedObj->GetReflectionType();
 			Expression *permissionFilter;
 
-			auto it = evaluatedTypes.find(reflectionType);
+			auto it = evaluatedTypes.find(reflectionType.get());
 
 			if (it == evaluatedTypes.end()) {
 				String permission = "objects/query/" + reflectionType->GetName();
@@ -273,12 +273,12 @@ bool ObjectQueryHandler::HandleRequest(
 					// The API user isn't authorized to access this relation, so just ignore it because there
 					// is no reason to raise an exception here since the actual object requested by the client
 					// has been found!!
-					evaluatedTypes.insert({reflectionType, false});
+					evaluatedTypes.insert({reflectionType.get(), false});
 
 					continue;
 				}
 
-				evaluatedTypes.insert({reflectionType, true});
+				evaluatedTypes.insert({reflectionType.get(), true});
 			} else if (!it->second) {
 				// Not authorized
 				continue;
