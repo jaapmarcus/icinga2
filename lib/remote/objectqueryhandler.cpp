@@ -8,6 +8,7 @@
 #include "base/configtype.hpp"
 #include <boost/algorithm/string/case_conv.hpp>
 #include <set>
+#include <unordered_map>
 
 using namespace icinga;
 
@@ -189,8 +190,8 @@ bool ObjectQueryHandler::HandleRequest(
 		joinAttrs.insert(field.Name);
 	}
 
-	std::set<String> grantedTypes;
-	Array::Ptr resolvedObjs;
+	std::unordered_map<Type::Ptr, bool> evaluatedTypes;
+	std::unordered_map<Object *, bool> joinedRelations;
 
 	for (const ConfigObject::Ptr& obj : objs) {
 		DictionaryData result1{
@@ -263,41 +264,47 @@ bool ObjectQueryHandler::HandleRequest(
 			Type::Ptr reflectionType = joinedObj->GetReflectionType();
 			Expression *permissionFilter;
 
-			if (grantedTypes.find(reflectionType->GetName()) == grantedTypes.end()) {
+			auto it = evaluatedTypes.find(reflectionType);
+
+			if (it == evaluatedTypes.end()) {
 				String permission = "objects/query/" + reflectionType->GetName();
 
 				if (!FilterUtility::HasPermission(user, permission, &permissionFilter)) {
 					// The API user isn't authorized to access this relation, so just ignore it because there
 					// is no reason to raise an exception here since the actual object requested by the client
 					// has been found!!
+					evaluatedTypes.insert({reflectionType, false});
+
 					continue;
 				}
 
-				grantedTypes.insert(reflectionType->GetName());
+				evaluatedTypes.insert({reflectionType, true});
+			} else if (!it->second) {
+				// Not authorized
+				continue;
 			}
 
-			if (!resolvedObjs || !resolvedObjs->Contains(joinedObj)) {
-				Namespace::Ptr frameNS = new Namespace();
-				ScriptFrame permissionFrame(false, frameNS);
-
-				/*
-				 * We're going to evaluate the permission filters of the requested base object on all the other joined
-				 * relations, so when we have a filter like {{ match(..., "host.vars......" }}, then we won't be able to
-				 * access the host object from the namespace. Therefore, we have to register the base obj type to the
-				 * namespace before evaluating the filter for joined relations.
-				 */
-				frameNS->Set(type->GetName().ToLower(), obj);
+			auto relation = joinedRelations.find(joinedObj.get());
+			if (relation == joinedRelations.end()) {
+				ScriptFrame permissionFrame(false, new Namespace());
 
 				try {
 					if (!FilterUtility::EvaluateFilter(permissionFrame, permissionFilter, joinedObj)) {
+						joinedRelations.insert({joinedObj.get(), false});
+
 						continue;
 					}
 				} catch (const ScriptError& err) {
+					joinedRelations.insert({joinedObj.get(), false});
+
 					// Nothing to do just continue
 					continue;
 				}
 
-				resolvedObjs->Add(joinedObj);
+				joinedRelations.insert({joinedObj.get(), true});
+			} else if (!relation->second) {
+				// Access denied
+				continue;
 			}
 
 			String prefix = field.NavigationName;
