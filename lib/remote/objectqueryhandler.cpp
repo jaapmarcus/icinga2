@@ -190,7 +190,7 @@ bool ObjectQueryHandler::HandleRequest(
 		joinAttrs.insert(field.Name);
 	}
 
-	std::unordered_map<Type*, bool> evaluatedTypes;
+	std::unordered_map<Type*, std::pair<Expression::Ptr, bool>> evaluatedTypes;
 	std::unordered_map<Object*, bool> joinedRelations;
 
 	for (const ConfigObject::Ptr& obj : objs) {
@@ -262,7 +262,8 @@ bool ObjectQueryHandler::HandleRequest(
 				continue;
 
 			Type::Ptr reflectionType = joinedObj->GetReflectionType();
-			Expression *permissionFilter;
+			Expression *permissionFilter = nullptr;
+			Expression::Ptr evaluatedFilter;
 
 			auto it = evaluatedTypes.find(reflectionType.get());
 
@@ -273,23 +274,33 @@ bool ObjectQueryHandler::HandleRequest(
 					// The API user isn't authorized to access this relation, so just ignore it because there
 					// is no reason to raise an exception here since the actual object requested by the client
 					// has been found!!
-					evaluatedTypes.insert({reflectionType.get(), false});
+					evaluatedFilter = permissionFilter;
+
+					evaluatedTypes.insert({reflectionType.get(), std::make_pair(evaluatedFilter, false)});
 
 					continue;
 				}
 
-				evaluatedTypes.insert({reflectionType.get(), true});
-			} else if (!it->second) {
-				// Not authorized
-				continue;
+				evaluatedFilter = permissionFilter;
+				evaluatedTypes.insert({reflectionType.get(), std::make_pair(evaluatedFilter, true)});
+			} else {
+				bool granted;
+
+				std::tie(evaluatedFilter, granted) = it->second;
+
+				if (! granted) {
+					// Not authorized
+					continue;
+				}
 			}
 
 			auto relation = joinedRelations.find(joinedObj.get());
+
 			if (relation == joinedRelations.end()) {
 				ScriptFrame permissionFrame(false, new Namespace());
 
 				try {
-					if (!FilterUtility::EvaluateFilter(permissionFrame, permissionFilter, joinedObj)) {
+					if (!FilterUtility::EvaluateFilter(permissionFrame, evaluatedFilter.get(), joinedObj)) {
 						joinedRelations.insert({joinedObj.get(), false});
 
 						continue;
