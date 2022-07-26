@@ -26,7 +26,7 @@ We recommend using our official repositories. Here's how to add it to your syste
 apt-get update
 apt-get -y install apt-transport-https wget gnupg
 
-wget -O - https://packages.icinga.com/icinga.key | apt-key add -
+wget -O - https://packages.icinga.com/icinga.key |  gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/icinga2.gpg  >/dev/nul
 
 DIST=$(awk -F"[)(]+" '/VERSION=/ {print $2}' /etc/os-release); \
  echo "deb https://packages.icinga.com/debian icinga-${DIST} main" > \
@@ -60,7 +60,7 @@ apt-get update
 apt-get update
 apt-get -y install apt-transport-https wget gnupg
 
-wget -O - https://packages.icinga.com/icinga.key | apt-key add -
+wget -O - https://packages.icinga.com/icinga.key |  gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/icinga2.gpg  >/dev/nul
 
 . /etc/os-release; if [ ! -z ${UBUNTU_CODENAME+x} ]; then DIST="${UBUNTU_CODENAME}"; else DIST="$(lsb_release -c| awk '{print $2}')"; fi; \
  echo "deb https://packages.icinga.com/ubuntu icinga-${DIST} main" > \
@@ -79,7 +79,7 @@ apt-get update
 apt-get update
 apt-get -y install apt-transport-https wget gnupg
 
-wget -O - https://packages.icinga.com/icinga.key | apt-key add -
+wget -O - https://packages.icinga.com/icinga.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/icinga2.gpg  >/dev/nul
 
 DIST=$(awk -F"[)(]+" '/VERSION=/ {print $2}' /etc/os-release); \
  echo "deb https://packages.icinga.com/raspbian icinga-${DIST} main" > \
